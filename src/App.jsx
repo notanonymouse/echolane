@@ -5,10 +5,19 @@ export default function App() {
   const [dateText, setDateText] = useState('');
   const [showCaregiver, setShowCaregiver] = useState(false);
 
+  // Caregiver Text Reminder State
   const [reminder, setReminder] = useState(() => {
     return localStorage.getItem('echo_reminder') || "Your daughter Sarah is coming to visit at 4:00 PM.";
   });
   const [inputNote, setInputNote] = useState(reminder);
+
+  // NEW FEATURE: Medication Tracking State
+  const [medsTaken, setMedsTaken] = useState(() => {
+    return localStorage.getItem('echo_meds_taken') === 'true';
+  });
+  const [medsTime, setMedsTime] = useState(() => {
+    return localStorage.getItem('echo_meds_time') || '';
+  });
 
   useEffect(() => {
     const updateDateTime = () => {
@@ -31,13 +40,19 @@ export default function App() {
   }, []);
 
   const handleSpeak = (e) => {
-    // Prevent double-triggering if they click the button specifically
     if (e) e.stopPropagation(); 
     
     window.speechSynthesis.cancel();
-    const textToSpeak = `Good day. ${timeText}. Today is ${dateText}. The weather outside is warm and clear. Here is your message for today: ${reminder}. You are safe, and everything is okay.`;
+    
+    let medStatusText = "You have not taken your morning medicine yet. Please remember to check the button below.";
+    if (medsTaken) {
+      medStatusText = `Your morning medicine was successfully taken at ${medsTime}.`;
+    }
+
+    const textToSpeak = `Good day. ${timeText}. Today is ${dateText}. The weather outside is warm and clear. ${medStatusText} Here is your personal message: ${reminder}. You are safe, and everything is okay.`;
+    
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
-    utterance.rate = 0.75; // Perfectly paced for clear hearing
+    utterance.rate = 0.75; 
     window.speechSynthesis.speak(utterance);
   };
 
@@ -45,6 +60,30 @@ export default function App() {
     e.preventDefault();
     setReminder(inputNote);
     localStorage.setItem('echo_reminder', inputNote);
+  };
+
+  // NEW FEATURE: Toggle medication status and lock in the timestamps
+  const handleMedCheck = (e) => {
+    e.stopPropagation(); // Stop from reading the whole card aloud
+    if (!medsTaken) {
+      const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      setMedsTaken(true);
+      setMedsTime(currentTime);
+      localStorage.setItem('echo_meds_taken', 'true');
+      localStorage.setItem('echo_meds_time', currentTime);
+      
+      // Auditory confirmation for patient safety
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(`Medicine confirmed taken at ${currentTime}. Thank you.`);
+      utterance.rate = 0.8;
+      window.speechSynthesis.speak(utterance);
+    } else {
+      // Allow undoing from clicking again
+      setMedsTaken(false);
+      setMedsTime('');
+      localStorage.setItem('echo_meds_taken', 'false');
+      localStorage.removeItem('echo_meds_time');
+    }
   };
 
   return (
@@ -76,74 +115,115 @@ export default function App() {
       {/* MAIN VIEW */}
       <main className="flex-1 max-w-6xl w-full mx-auto p-6 flex flex-col lg:flex-row gap-8 justify-center items-center my-auto transition-all duration-500">
         
-        {/* PATIENT VIEW (Clicking anywhere triggers voice guidance) */}
+        {/* PATIENT DASHBOARD SCREEN */}
         <section 
           onClick={() => handleSpeak()}
-          className={`w-full ${showCaregiver ? 'lg:w-2/3' : 'max-w-3xl'} bg-slate-900/40 p-8 md:p-14 rounded-[2rem] border border-indigo-500/10 shadow-2xl shadow-indigo-950/50 backdrop-blur-xl space-y-10 flex flex-col justify-between transition-all duration-500 relative overflow-hidden group cursor-pointer hover:border-emerald-500/20 active:scale-[0.99]`}
+          className={`w-full ${showCaregiver ? 'lg:w-2/3' : 'max-w-3xl'} bg-slate-900/40 p-8 md:p-12 rounded-[2rem] border border-indigo-500/10 shadow-2xl shadow-indigo-950/50 backdrop-blur-xl space-y-8 flex flex-col justify-between transition-all duration-500 relative overflow-hidden group cursor-pointer hover:border-emerald-500/20 active:scale-[0.99]`}
         >
-          
           {/* Ambient Glow */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none group-hover:bg-emerald-500/10 transition-colors duration-500"></div>
           
-          <div className="space-y-4">
+          {/* Time & Orientation Block */}
+          <div className="space-y-3">
             <div className="flex justify-between items-start">
               <span className="text-xs font-black tracking-widest text-emerald-400/80 uppercase px-3 py-1 bg-emerald-500/10 rounded-md inline-block">
                 Your Daily Anchor
               </span>
-              {/* ACCESSIBILITY TIP */}
-              <span className="text-xs text-slate-500 font-medium hidden sm:inline-block">💡 Click anywhere to listen</span>
+              <span className="text-xs text-slate-500 font-medium hidden sm:inline-block">💡 Tap screen to speak everything</span>
             </div>
             
-            <h2 className="text-5xl md:text-7xl font-black tracking-tight text-white leading-none drop-shadow-sm">
+            <h2 className="text-5xl md:text-6xl font-black tracking-tight text-white leading-none drop-shadow-sm">
               {timeText || "Loading..."}
             </h2>
             
-            {/* UPDATED DATE & WEATHER BLOCK */}
-            <div className="flex flex-wrap items-center gap-3 text-xl md:text-2xl text-slate-400 font-medium tracking-wide">
+            <div className="flex flex-wrap items-center gap-3 text-lg md:text-xl text-slate-400 font-medium tracking-wide">
               <span>{dateText}</span>
               <span className="text-slate-600 hidden sm:inline">•</span>
-              <span className="text-emerald-400/90 bg-slate-950/40 px-3 py-0.5 rounded-xl border border-slate-800 text-lg flex items-center gap-1.5">
+              <span className="text-emerald-400/90 bg-slate-950/40 px-3 py-0.5 rounded-xl border border-slate-800 text-base flex items-center gap-1.5">
                 🌤️ 24°C · Clear & Warm
               </span>
             </div>
           </div>
 
-          <div className="bg-slate-950/70 p-6 md:p-10 rounded-2xl border border-indigo-500/5 relative shadow-inner">
-            <span className="text-xs font-bold tracking-widest text-indigo-400/60 uppercase block mb-3 font-mono">
+          {/* Caregiver Text Message Section */}
+          <div className="bg-slate-950/70 p-5 md:p-8 rounded-2xl border border-indigo-500/5 shadow-inner">
+            <span className="text-xs font-bold tracking-widest text-indigo-400/60 uppercase block mb-2 font-mono">
               Caregiver Note
             </span>
-            <p className="text-2xl md:text-4xl font-extrabold text-teal-300 leading-relaxed drop-shadow-md">
+            <p className="text-xl md:text-3xl font-extrabold text-teal-300 leading-relaxed">
               "{reminder}"
             </p>
           </div>
 
-          {/* MASSIVE AUDIO BUTTON FOR PATIENT */}
+          {/* TWO-COLUMN MICRO UTILITIES */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            
+            {/* NEW ENHANCEMENT: MEDICATION CHECK-IN CARD */}
+            <div 
+              onClick={handleMedCheck}
+              className={`p-5 rounded-2xl border transition-all duration-300 flex flex-col justify-between h-36 ${
+                medsTaken 
+                  ? 'bg-emerald-500/10 border-emerald-500/30 shadow-lg shadow-emerald-950/20' 
+                  : 'bg-slate-950/40 border-slate-800 hover:border-amber-500/30'
+              }`}
+            >
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block">Morning Treatment</span>
+                <p className="text-lg font-bold text-white mt-1">Have you taken your pills?</p>
+              </div>
+              {medsTaken ? (
+                <div className="flex items-center gap-2 text-emerald-400 font-black text-sm uppercase font-mono bg-emerald-500/10 px-3 py-1.5 rounded-xl w-fit border border-emerald-500/20">
+                  ✅ Taken at {medsTime}
+                </div>
+              ) : (
+                <div className="text-amber-400 font-bold text-xs uppercase font-mono bg-amber-500/10 px-3 py-1.5 rounded-xl w-fit border border-amber-500/20 animate-pulse">
+                  💊 Tap to Mark as Taken
+                </div>
+              )}
+            </div>
+
+            {/* NEW ENHANCEMENT: EMERGENCY ONE-TOUCH QUICK DIAL CARD */}
+            <a 
+              href="tel:5551234567"
+              onClick={(e) => e.stopPropagation()} // Stop voice engine from firing
+              className="p-5 rounded-2xl border bg-slate-950/40 border-slate-800 hover:border-sky-500/30 transition-all flex flex-col justify-between h-36 group/call"
+            >
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block">Immediate Help</span>
+                <p className="text-lg font-bold text-white mt-1">Need to speak with family?</p>
+              </div>
+              <div className="flex items-center gap-2 text-sky-400 font-black text-sm uppercase font-mono bg-sky-500/10 px-3 py-1.5 rounded-xl w-fit border border-sky-500/20 group-hover/call:bg-sky-500 group-hover/call:text-slate-950 transition-all duration-300">
+                📞 Call Daughter Sarah
+              </div>
+            </a>
+
+          </div>
+
+          {/* MAIN MASSIVE AUDIO SPEAKER BUTTON */}
           <button 
             onClick={handleSpeak}
-            className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-2xl py-6 rounded-2xl transition-all duration-300 shadow-xl shadow-emerald-950/40 hover:shadow-emerald-500/20 flex items-center justify-center gap-4 hover:tracking-wide"
+            className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-xl md:text-2xl py-5 rounded-2xl transition-all duration-300 shadow-xl shadow-emerald-950/40 hover:shadow-emerald-500/20 flex items-center justify-center gap-4 hover:tracking-wide"
           >
-            <span className="text-3xl animate-pulse">🔊</span> Click to Hear This Aloud
+            <span className="text-2xl animate-pulse">🔊</span> Click to Hear Everything Aloud
           </button>
         </section>
 
-        {/* CAREGIVER DASHBOARD */}
+        {/* CAREGIVER DASHBOARD INPUT DRAWER */}
         {showCaregiver && (
           <section className="w-full lg:w-1/3 bg-slate-900/80 p-6 rounded-2xl border border-rose-500/20 shadow-xl space-y-5 animate-fadeIn backdrop-blur-lg">
             <div className="flex items-center gap-2 pb-2 border-b border-slate-800">
               <span className="text-xl">👩‍⚕️</span>
-              <h3 className="text-lg font-bold text-slate-200">
-                Caregiver Control Panel
-              </h3>
+              <h3 className="text-lg font-bold text-slate-200">Caregiver Control Panel</h3>
             </div>
             
             <p className="text-xs text-slate-400 leading-relaxed">
-              This panel simulator lets you edit what your patient sees remotely. Updates deploy immediately to the wall panel.
+              Remote administration dashboard. Use this tool to send active updates down to the patient bedside screen display.
             </p>
             
             <form onSubmit={saveNote} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-indigo-300 uppercase tracking-wider mb-2 font-mono">
-                  Active Notice Text
+                  Active Screen Reminder Text
                 </label>
                 <textarea 
                   value={inputNote}
@@ -158,7 +238,7 @@ export default function App() {
                 type="submit"
                 className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-sm font-bold py-3.5 rounded-xl transition duration-200 shadow-lg shadow-indigo-950 border border-indigo-400/20 active:scale-95"
               >
-                📡 Push Update to Device
+                📡 Push Notice to Display
               </button>
             </form>
           </section>
